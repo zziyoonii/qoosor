@@ -121,7 +121,12 @@ function performBasicTransformation(text) {
   return transformed;
 }
 
-// 헬스체크 엔드포인트
+// 루트 주소 응답
+app.get('/', (req, res) => {
+  res.send('🤖 qoo의 CX 분신 서버가 정상 작동 중입니다!');
+});
+
+// 헬스 체크 API (프론트/모니터링 용)
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -130,7 +135,16 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+
 app.listen(PORT, () => {
   console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
   console.log(`AI API 상태: ${process.env.OPENAI_API_KEY ? '사용 가능' : 'API 키 없음'}`);
 }); 
+
+// server.js
+
+require('dotenv').config(); // .env 파일을 읽어옴
+
+const apiKey = process.env.OPENAI_API_KEY;
+
+console.log("🔐 내 API 키:", apiKey);
