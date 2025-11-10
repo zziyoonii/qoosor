@@ -54,6 +54,38 @@ npm run dev:full
 npm run build
 ```
 
+## 🌐 배포
+
+### Vercel 배포 (권장)
+
+1. **Vercel CLI 설치** (선택사항):
+```bash
+npm i -g vercel
+```
+
+2. **GitHub에 코드 푸시**:
+```bash
+git add .
+git commit -m "Add Vercel deployment support"
+git push origin main
+```
+
+3. **Vercel 대시보드에서 배포**:
+   - [Vercel](https://vercel.com)에 로그인
+   - "New Project" 클릭
+   - GitHub 저장소 연결
+   - 자동으로 배포됨
+
+4. **또는 Vercel CLI로 배포**:
+```bash
+vercel
+```
+
+### 로컬 개발 vs Vercel 배포
+
+- **로컬 개발**: `npm run dev:full` (Express 서버 + React 개발 서버)
+- **Vercel 배포**: 서버리스 함수 사용 (Express 서버 불필요)
+
 ## 💡 사용법
 
 1. **개발자 답변 입력**: 기술적인 내용을 포함한 답변을 입력합니다.

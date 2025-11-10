@@ -71,11 +71,7 @@ app.post('/api/gpt', async (req, res) => {
     const result = toneResponses[keyword] || toneResponses['기본'];
 
     res.json({
-      result,
-      originalText: input,
-      tone: tone || '기본',
-      timestamp: new Date().toISOString(),
-      note: '목업 응답을 사용했습니다.'
+      result
     });
 
   } catch (error) {

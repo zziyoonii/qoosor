@@ -583,8 +583,8 @@ body {
 
 /* 카테고리 내용 내부의 용어 그리드는 더 넓게 */
 .category-content .terms-grid {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1.2rem;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
 }
 
 .term-card {
