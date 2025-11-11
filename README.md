@@ -21,6 +21,19 @@ npm install
 
 ### 환경 설정
 
+#### 방법 1: 설정 파일 사용 (권장)
+
+1. `src/config.js` 파일을 열어서 API 토큰을 추가합니다:
+```javascript
+export const API_CONFIG = {
+  apiKey: 'your-api-key-here',  // 🔑 여기에 API 토큰 추가
+  apiUrl: 'http://localhost:3001/api/gpt',
+  useAPI: true  // ⚙️ API 사용하려면 true로 변경
+};
+```
+
+#### 방법 2: 환경 변수 사용
+
 1. `env.example` 파일을 `.env`로 복사합니다:
 ```bash
 cp env.example .env
@@ -30,6 +43,13 @@ cp env.example .env
 ```
 OPENAI_API_KEY=your_openai_api_key_here
 ```
+
+3. React 앱에서 환경 변수를 사용하려면 `REACT_APP_` 접두사를 붙여야 합니다:
+```
+REACT_APP_API_KEY=your_openai_api_key_here
+```
+
+**참고**: 현재는 기본 변환 로직만 사용 중입니다. API를 사용하려면 `src/config.js`에서 `useAPI: true`로 설정하세요.
 
 ### 개발 서버 실행
 
