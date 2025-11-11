@@ -1,11 +1,9 @@
 {
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": null,
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
     {
       "src": "/(.*)",
       "dest": "/index.html"
