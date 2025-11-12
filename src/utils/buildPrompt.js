@@ -24,6 +24,7 @@ export const detectLanguage = (text) => {
 export const buildPrompt = (input, tone = '기본', language = null) => {
   // 언어 자동 감지 (언어가 지정되지 않은 경우)
   const detectedLanguage = language || detectLanguage(input);
+  const inputLanguage = detectLanguage(input);
   
   let toneGuide = '';
 
@@ -84,13 +85,19 @@ An error occurred due to temporary authentication interruption, and the service 
         toneGuide = '';
     }
 
+    // 입력이 한국어이고 출력 언어가 영어인 경우 명시적으로 영어로 답변하라는 지시 추가
+    const languageInstruction = inputLanguage === 'ko' && detectedLanguage === 'en' 
+      ? '\nIMPORTANT: The input text is in Korean, but you MUST respond in English only. Translate and rewrite the content in English.\n'
+      : '';
+
     return `
 ${toneGuide}
-
+${languageInstruction}
 The following is the developer's technical explanation:
 "${input}"
 
 Please rewrite the above content in "${tone}" tone for customer communication.
+${inputLanguage === 'ko' && detectedLanguage === 'en' ? 'Remember: Respond in English only.' : ''}
 `;
   } else {
     // 한국어 프롬프트 (기존)

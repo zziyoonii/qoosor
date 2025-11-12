@@ -6,7 +6,7 @@ import { API_CONFIG } from './config';
 function App() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedTone, setSelectedTone] = useState('기본');
+  const [selectedTone, setSelectedTone] = useState(null);
   const [outputTextKO, setOutputTextKO] = useState(''); // 한국어 답변
   const [outputTextEN, setOutputTextEN] = useState(''); // 영어 답변
   const [showPromptPreview, setShowPromptPreview] = useState(false);
@@ -540,10 +540,15 @@ function App() {
     const targetLanguage = outputLang === 'auto' ? detectLanguage(text) : outputLang;
     const lowerText = text.toLowerCase();
     
-    // 영어 처리
-    if (targetLanguage === 'en') {
-      // Database/Server error related Mock responses
-      if (lowerText.includes('database') || lowerText.includes('query') || lowerText.includes('timeout') || lowerText.includes('500') || lowerText.includes('server')) {
+    // 출력 언어가 영어인 경우 영어 답변 반환
+    if (outputLang === 'en' || targetLanguage === 'en') {
+      // 한국어 템플릿도 영어 답변으로 변환하기 위해 한국어 키워드도 체크
+      const textLower = text.toLowerCase();
+      
+      // Database/Server error related Mock responses (영어 + 한국어 키워드)
+      if (lowerText.includes('database') || lowerText.includes('query') || lowerText.includes('timeout') || lowerText.includes('500') || lowerText.includes('server') ||
+          textLower.includes('데이터베이스') || textLower.includes('쿼리') || textLower.includes('타임아웃') || textLower.includes('서버') || 
+          (textLower.includes('일시적') && textLower.includes('문제'))) {
         const dbErrorResponses = {
           '기본': 'Hello. A temporary system issue occurred. The service is currently available normally, and we will resolve it as soon as possible. We apologize for the inconvenience.',
           '정중형': 'Hello. We apologize for the inconvenience caused by a temporary system issue. The service is currently available normally, and we will resolve it as soon as possible.',
@@ -555,8 +560,9 @@ function App() {
         return dbErrorResponses[tone] || dbErrorResponses['기본'];
       }
       
-      // 502 error related Mock responses
-      if (lowerText.includes('502') || lowerText.includes('error') || lowerText.includes('token') || lowerText.includes('authentication') || lowerText.includes('cache') || lowerText.includes('root cause')) {
+      // 502 error related Mock responses (영어 + 한국어 키워드)
+      if (lowerText.includes('502') || lowerText.includes('error') || lowerText.includes('token') || lowerText.includes('authentication') || lowerText.includes('cache') || lowerText.includes('root cause') ||
+          textLower.includes('에러') || textLower.includes('토큰') || textLower.includes('인증') || textLower.includes('캐시') || textLower.includes('근본 원인')) {
         const errorResponses = {
           '기본': 'Hello. A temporary system error occurred. The service is currently available normally, and we are checking to prevent recurrence. We apologize for the inconvenience.',
           '정중형': 'Hello. We apologize for the inconvenience caused by a temporary system error. The service is currently available normally, and we are checking to prevent recurrence.',
@@ -568,8 +574,9 @@ function App() {
         return errorResponses[tone] || errorResponses['기본'];
       }
       
-      // System maintenance related Mock responses
-      if (lowerText.includes('maintenance') || lowerText.includes('inspection') || lowerText.includes('restricted') || lowerText.includes('limited')) {
+      // System maintenance related Mock responses (영어 + 한국어 키워드)
+      if (lowerText.includes('maintenance') || lowerText.includes('inspection') || lowerText.includes('restricted') || lowerText.includes('limited') ||
+          textLower.includes('점검') || textLower.includes('제한')) {
         const maintenanceResponses = {
           '기본': 'Hello. The system is currently under maintenance. Service usage may be temporarily restricted. We apologize for the inconvenience.',
           '정중형': 'Hello. The system is currently under maintenance. Service usage may be temporarily restricted. We appreciate your understanding and apologize for the inconvenience.',
@@ -581,8 +588,9 @@ function App() {
         return maintenanceResponses[tone] || maintenanceResponses['기본'];
       }
       
-      // Problem checking related Mock responses
-      if (lowerText.includes('checking') && lowerText.includes('problem')) {
+      // Problem checking related Mock responses (영어 + 한국어 키워드)
+      if ((lowerText.includes('checking') && lowerText.includes('problem')) ||
+          (textLower.includes('확인') && textLower.includes('문제'))) {
         const checkingResponses = {
           '기본': 'Hello. We are checking the issue you mentioned. Our technical team is finding a solution, so please wait a moment.',
           '정중형': 'Hello. We are checking the issue you mentioned. Our technical team is finding a solution, so please wait a moment.',
@@ -594,8 +602,9 @@ function App() {
         return checkingResponses[tone] || checkingResponses['기본'];
       }
       
-      // Resolved related Mock responses
-      if (lowerText.includes('resolved') || lowerText.includes('fixed') || (lowerText.includes('issue') && lowerText.includes('solved'))) {
+      // Resolved related Mock responses (영어 + 한국어 키워드)
+      if (lowerText.includes('resolved') || lowerText.includes('fixed') || (lowerText.includes('issue') && lowerText.includes('solved')) ||
+          (textLower.includes('해결') && (textLower.includes('완료') || textLower.includes('되었')))) {
         const resolvedResponses = {
           '기본': 'Hello. The issue you previously inquired about has been resolved. Please try using the service again. We apologize for the inconvenience.',
           '정중형': 'Hello. The issue you previously inquired about has been resolved. Please try using the service again. We apologize for the inconvenience.',
@@ -614,7 +623,7 @@ function App() {
     
     // 한국어 처리 (기존 로직)
     // 데이터베이스/서버 에러 관련 Mock 응답
-    if (lowerText.includes('데이터베이스') || lowerText.includes('쿼리') || lowerText.includes('타임아웃') || lowerText.includes('500') || lowerText.includes('서버에서')) {
+    if (lowerText.includes('데이터베이스') || lowerText.includes('쿼리') || lowerText.includes('타임아웃') || lowerText.includes('500') || lowerText.includes('서버에서') || (lowerText.includes('일시적') && lowerText.includes('문제'))) {
       const dbErrorResponses = {
         '기본': '안녕하세요. 일시적인 시스템 문제가 발생했습니다. 현재는 정상적으로 이용 가능하시며, 빠른 시일 내에 해결하도록 하겠습니다. 불편을 드려 죄송합니다.',
         '정중형': '안녕하세요. 일시적인 시스템 문제가 발생하여 불편을 드려 죄송합니다. 현재는 정상적으로 이용 가능하시며, 빠른 시일 내에 해결하도록 하겠습니다.',
@@ -737,6 +746,12 @@ function App() {
   // 답변 생성 함수
   const generateResponse = async () => {
     if (!inputText.trim()) return;
+    
+    // 톤이 선택되지 않았으면 경고 표시
+    if (!selectedTone) {
+      alert('답변 톤을 선택해주세요.');
+      return;
+    }
 
     setIsLoading(true);
     setIsCopiedKO(false);
@@ -745,8 +760,8 @@ function App() {
     try {
       // 한국어와 영어 두 가지 버전 모두 생성
       const [customerFriendlyTextKO, customerFriendlyTextEN] = await Promise.all([
-        generateAICustomerFriendlyResponse(inputText, selectedTone, 'ko'),
-        generateAICustomerFriendlyResponse(inputText, selectedTone, 'en')
+        generateAICustomerFriendlyResponse(inputText, selectedTone || '기본', 'ko'),
+        generateAICustomerFriendlyResponse(inputText, selectedTone || '기본', 'en')
       ]);
       setOutputTextKO(customerFriendlyTextKO);
       setOutputTextEN(customerFriendlyTextEN);
@@ -754,8 +769,8 @@ function App() {
       console.error('변환 오류:', error);
       // 오류 발생 시 기본 변환 사용
       const simplifiedText = simplifyTechnicalTerms(inputText);
-      const customerFriendlyTextKO = generateCustomerFriendlyResponse(simplifiedText, selectedTone, 'ko');
-      const customerFriendlyTextEN = generateCustomerFriendlyResponse(simplifiedText, selectedTone, 'en');
+      const customerFriendlyTextKO = generateCustomerFriendlyResponse(simplifiedText, selectedTone || '기본', 'ko');
+      const customerFriendlyTextEN = generateCustomerFriendlyResponse(simplifiedText, selectedTone || '기본', 'en');
       setOutputTextKO(customerFriendlyTextKO);
       setOutputTextEN(customerFriendlyTextEN);
     } finally {
@@ -808,31 +823,19 @@ function App() {
     }
   ];
 
-  const useQuickResponse = async (template) => {
+  const useQuickResponse = (template) => {
+    // 템플릿만 입력란에 넣고, 자동 변환은 하지 않음
     setInputText(template);
-    // 템플릿 선택 시 자동으로 변환 실행
-    setIsLoading(true);
     setIsCopiedKO(false);
     setIsCopiedEN(false);
-    
-    try {
-      // 한국어와 영어 두 가지 버전 모두 생성
-      const [customerFriendlyTextKO, customerFriendlyTextEN] = await Promise.all([
-        generateAICustomerFriendlyResponse(template, selectedTone, 'ko'),
-        generateAICustomerFriendlyResponse(template, selectedTone, 'en')
-      ]);
-      setOutputTextKO(customerFriendlyTextKO);
-      setOutputTextEN(customerFriendlyTextEN);
-    } catch (error) {
-      console.error('변환 오류:', error);
-      const simplifiedText = simplifyTechnicalTerms(template);
-      const customerFriendlyTextKO = generateCustomerFriendlyResponse(simplifiedText, selectedTone, 'ko');
-      const customerFriendlyTextEN = generateCustomerFriendlyResponse(simplifiedText, selectedTone, 'en');
-      setOutputTextKO(customerFriendlyTextKO);
-      setOutputTextEN(customerFriendlyTextEN);
-    } finally {
-      setIsLoading(false);
-    }
+    // 입력 영역으로 포커스 이동
+    setTimeout(() => {
+      const textarea = document.getElementById('input-text');
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(template.length, template.length);
+      }
+    }, 100);
   };
 
   return (
@@ -921,7 +924,7 @@ function App() {
                     </button>
                   ))}
                 </div>
-                <p className="tone-description">{getToneDescription(selectedTone, 'ko')}</p>
+                <p className="tone-description">{selectedTone ? getToneDescription(selectedTone, 'ko') : '답변 톤을 선택해주세요.'}</p>
               </div>
 
               {/* 프롬프트 미리보기 */}
@@ -935,7 +938,7 @@ function App() {
                 {showPromptPreview && inputText && (
                   <div className="preview-content">
                     <h5>AI에게 전달되는 프롬프트:</h5>
-                    <pre>{buildPrompt(inputText, selectedTone)}</pre>
+                    <pre>{buildPrompt(inputText, selectedTone || '기본')}</pre>
                 </div>
                 )}
                 </div>
@@ -965,7 +968,7 @@ function App() {
                 onClick={generateResponse}
                 disabled={isLoading || !inputText.trim()}
               >
-                {isLoading ? '변환 중...' : `${selectedTone} 톤으로 변환`}
+                {isLoading ? '변환 중...' : selectedTone ? `${selectedTone} 톤으로 변환` : '톤을 선택하고 변환'}
               </button>
             </div>
 

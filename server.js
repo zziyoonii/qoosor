@@ -80,18 +80,48 @@ app.post('/api/gpt', async (req, res) => {
         }
       };
 
-      // 영어 키워드 찾기
+      // 영어 키워드 찾기 (영어 + 한국어 키워드 모두 체크)
       const findKeywordEN = (text) => {
-        const keywords = ['maintenance', 'server error', 'API error', 'database', 'timeout'];
-        for (const keyword of keywords) {
-          if (text.includes(keyword)) {
+        const textLower = text.toLowerCase();
+        
+        // 영어 키워드
+        const englishKeywords = ['maintenance', 'server error', 'API error', 'database', 'timeout'];
+        for (const keyword of englishKeywords) {
+          if (textLower.includes(keyword)) {
             return keyword;
           }
         }
+        
+        // 한국어 키워드 → 영어 키워드 매핑
+        if (textLower.includes('점검') || textLower.includes('제한')) {
+          return 'maintenance';
+        }
+        if (textLower.includes('서버') && textLower.includes('오류')) {
+          return 'server error';
+        }
+        if (textLower.includes('api') && textLower.includes('오류')) {
+          return 'API error';
+        }
+        if (textLower.includes('데이터베이스') || textLower.includes('쿼리')) {
+          return 'database';
+        }
+        if (textLower.includes('타임아웃') || textLower.includes('시간 초과')) {
+          return 'timeout';
+        }
+        if (textLower.includes('일시적') && textLower.includes('문제')) {
+          return 'server error';
+        }
+        if (textLower.includes('해결') && (textLower.includes('완료') || textLower.includes('되었'))) {
+          return 'maintenance'; // 해결 완료는 maintenance로 매핑
+        }
+        if (textLower.includes('확인') && textLower.includes('문제')) {
+          return 'server error'; // 문제 확인 중은 server error로 매핑
+        }
+        
         return '기본';
       };
 
-      const keyword = findKeywordEN(lowerText);
+      const keyword = findKeywordEN(input);
       const toneResponses = mockResponsesEN[tone] || mockResponsesEN['기본'];
       const result = toneResponses[keyword] || toneResponses['기본'];
 
