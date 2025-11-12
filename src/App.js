@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import './App.css';
-import { buildPrompt, getToneOptions, getToneDescription } from './utils/buildPrompt';
+import { buildPrompt, getToneOptions, getToneDescription, detectLanguage } from './utils/buildPrompt';
 import { API_CONFIG } from './config';
 
 function App() {
   const [inputText, setInputText] = useState('');
-  const [outputText, setOutputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTone, setSelectedTone] = useState('기본');
+  const [outputTextKO, setOutputTextKO] = useState(''); // 한국어 답변
+  const [outputTextEN, setOutputTextEN] = useState(''); // 영어 답변
   const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState({});
-  const [isCopied, setIsCopied] = useState(false);
+  const [isCopiedKO, setIsCopiedKO] = useState(false);
+  const [isCopiedEN, setIsCopiedEN] = useState(false);
 
   // 전문용어 사전 (실제로는 더 많은 용어들이 추가될 수 있습니다)
   const technicalTerms = {
@@ -171,9 +173,117 @@ function App() {
   };
 
   // 고객 친화적인 답변 생성 함수
-  const generateCustomerFriendlyResponse = (input, tone = '기본') => {
-    console.log('톤 변환 시작:', { input: input.substring(0, 50), tone });
+  const generateCustomerFriendlyResponse = (input, tone = '기본', outputLang = 'auto') => {
+    // 출력 언어 결정: 'auto'면 입력 언어 감지, 아니면 선택한 언어 사용
+    let targetLanguage = outputLang === 'auto' ? detectLanguage(input) : outputLang;
+    console.log('톤 변환 시작:', { input: input.substring(0, 50), tone, detectedLang: detectLanguage(input), outputLang, targetLanguage });
     let response = input;
+
+    // 영어 처리
+    if (targetLanguage === 'en') {
+      // 1단계: 불필요한 기술적 세부사항 제거
+      const removePatterns = [
+        /server error \d+/gi,
+        /database query/gi,
+        /API call/gi,
+        /cache/gi,
+        /memory/gi,
+        /authentication server/gi,
+        /token expired/gi,
+        /after cache initialization/gi,
+        /temporary fix/gi,
+        /root cause analysis/gi
+      ];
+
+      removePatterns.forEach(pattern => {
+        response = response.replace(pattern, '');
+      });
+
+      // 2단계: 에러 코드 및 기술 용어 변환
+      response = response.replace(/\b\d{3}\s*error\b/gi, 'system error');
+      response = response.replace(/500\s*error/gi, 'system error');
+      response = response.replace(/502\s*error/gi, 'system error');
+      response = response.replace(/503\s*error/gi, 'system error');
+      response = response.replace(/404\s*error/gi, 'page not found');
+      response = response.replace(/401\s*error/gi, 'authentication error');
+      response = response.replace(/403\s*error/gi, 'access denied');
+
+      // 3단계: 개발자 용어를 고객 친화적으로 변경
+      const replacements = [
+        { pattern: /\bbug\b/gi, replacement: 'issue' },
+        { pattern: /\btimeout\b/gi, replacement: 'processing delay' },
+        { pattern: /\bdatabase\b/gi, replacement: 'data storage' },
+        { pattern: /\bAPI\b/gi, replacement: 'external service' },
+        { pattern: /\bcache\b/gi, replacement: 'temporary storage' },
+        { pattern: /\bdeploy\b/gi, replacement: 'update' },
+        { pattern: /\bdeployment\b/gi, replacement: 'update' },
+        { pattern: /\bserver\b/gi, replacement: 'system' },
+        { pattern: /\bquery\b/gi, replacement: 'data request' },
+        { pattern: /\blibrary\b/gi, replacement: 'feature set' },
+        { pattern: /\bframework\b/gi, replacement: 'development tool' },
+        { pattern: /\bmodule\b/gi, replacement: 'feature' },
+        { pattern: /\bplugin\b/gi, replacement: 'add-on' },
+        { pattern: /\bSDK\b/gi, replacement: 'development tool' },
+        { pattern: /\bpatch\b/gi, replacement: 'fix' },
+        { pattern: /\bhotfix\b/gi, replacement: 'urgent fix' },
+        { pattern: /\brollback\b/gi, replacement: 'revert' },
+        { pattern: /\bdowntime\b/gi, replacement: 'service interruption' },
+        { pattern: /\bperformance issue\b/gi, replacement: 'speed issue' },
+        { pattern: /\bissue\b/gi, replacement: 'problem' },
+        { pattern: /\bmemory leak\b/gi, replacement: 'system resource issue' },
+        { pattern: /\bnetwork latency\b/gi, replacement: 'connection delay' }
+      ];
+
+      replacements.forEach(({ pattern, replacement }) => {
+        response = response.replace(pattern, replacement);
+      });
+
+      // 4단계: 문장 정리
+      response = response.replace(/,\s*,/g, ',');
+      response = response.replace(/\s+/g, ' ');
+      response = response.replace(/\.\s*\./g, '.');
+      response = response.trim();
+
+      // 5단계: 톤별 변환 적용
+      switch (tone) {
+        case '정중형':
+          // Formal and polite tone
+          if (!response.toLowerCase().includes('apologize') && !response.toLowerCase().includes('sorry')) {
+            if (response.toLowerCase().includes('hello') || response.toLowerCase().includes('hi')) {
+              response = response.replace(/(hello|hi)\./gi, '$1. We apologize for the inconvenience.');
+            } else {
+              response = 'We apologize for the inconvenience. ' + response;
+            }
+          }
+          break;
+
+        case '공감형':
+          // Empathetic tone
+          if (!response.toLowerCase().includes('apologize') && !response.toLowerCase().includes('sorry')) {
+            if (response.toLowerCase().includes('hello') || response.toLowerCase().includes('hi')) {
+              response = response.replace(/(hello|hi)\./gi, '$1. We sincerely apologize for the inconvenience.');
+            } else {
+              response = 'We sincerely apologize for the inconvenience. ' + response;
+            }
+          }
+          break;
+
+        case '간결형':
+          // Brief and clear
+          response = response.replace(/we (apologize|sincerely apologize) for the inconvenience\.?\s*/gi, 'Sorry. ');
+          break;
+
+        case '기본':
+        default:
+          // Natural and friendly tone
+          break;
+      }
+
+      console.log('톤 변환 완료 (영어):', { tone, before: input.substring(0, 50), after: response.substring(0, 50) });
+      return response.trim();
+    }
+
+    // 한국어 처리 (기존 로직)
 
     // 1단계: 불필요한 기술적 세부사항 제거
     const removePatterns = [
@@ -358,20 +468,28 @@ function App() {
         break;
 
       case '간결형':
-        // 짧고 명확하게 (핵심만)
-        // 사과 표현 제거
-        response = response.replace(/불편을 드려 죄송합니다\.?\s*/g, '');
-        response = response.replace(/죄송합니다\.?\s*/g, '');
-        response = response.replace(/정말 죄송합니다\.?\s*/g, '');
-        // 불필요한 수식어 제거
+        // 짧고 명확하게 (하지만 고객 친화적으로)
+        // 과도한 사과 표현만 간소화 (완전히 제거하지 않음)
+        response = response.replace(/불편을 드려 죄송합니다\.?\s*/g, '죄송합니다. ');
+        response = response.replace(/정말 죄송합니다\.?\s*/g, '죄송합니다. ');
+        // 불필요한 수식어만 제거 (핵심 정보는 유지)
         response = response.replace(/일시적으로/g, '');
         response = response.replace(/일시적인/g, '');
-        response = response.replace(/현재/g, '');
-        // 문장 간소화
-        response = response.replace(/중입니다/g, '중');
-        response = response.replace(/중이에요/g, '중');
+        // 문장을 간결하게 만들되 완전한 문장 유지
+        response = response.replace(/중이에요\./g, '중입니다.');
+        // 중복된 표현 제거
         response = response.replace(/\.\s*\./g, '.');
         response = response.replace(/\s+/g, ' ');
+        // 너무 짧게 만들지 않도록 최소 길이 보장
+        // 간결하지만 완전한 문장으로 유지
+        if (response.length < 30 && !response.includes('.')) {
+          // 너무 짧고 문장이 없으면 기본 형태로 복원
+          response = response.replace(/점검 중/g, '점검 중입니다');
+          response = response.replace(/제한/g, '제한될 수 있습니다');
+          if (!response.includes('죄송')) {
+            response = '죄송합니다. ' + response;
+          }
+        }
         break;
 
       case '전문형':
@@ -414,41 +532,176 @@ function App() {
   };
 
   // Mock AI 응답 생성 함수 (테스트용)
-  const generateMockAIResponse = async (text, tone = '기본') => {
+  const generateMockAIResponse = async (text, tone = '기본', outputLang = 'auto') => {
     // 실제 API 호출을 시뮬레이션 (약간의 지연)
     await new Promise(resolve => setTimeout(resolve, 800));
     
-    // 톤별 Mock 응답 예시
-    const mockResponses = {
-      '기본': '안녕하세요. 현재 시스템 점검 중입니다. 일시적으로 서비스 이용이 제한될 수 있습니다. 불편을 드려 죄송합니다.',
-      '정중형': '안녕하세요. 현재 시스템 점검 중입니다. 일시적으로 서비스 이용이 제한될 수 있으니 양해 부탁드립니다. 불편을 드려 죄송합니다.',
-      '공감형': '안녕하세요. 불편을 드려 죄송해요. 현재 시스템 점검 중이에요. 다만 일시적으로 서비스 이용이 제한될 수 있어요. 빠르게 해결하도록 하겠습니다.',
-      '간결형': '시스템 점검 중. 서비스 이용 제한.',
-      '전문형': '안녕하세요. 현재 시스템 점검 중입니다. 일시적으로 서비스 이용이 제한될 수 있습니다.',
-      '친근형': '안녕하세요! 현재 시스템 점검 중이에요. 일시적으로 서비스 이용이 제한될 수 있어요. 양해 부탁드려요!'
-    };
+    // 출력 언어 결정: 'auto'면 입력 언어 감지, 아니면 선택한 언어 사용
+    const targetLanguage = outputLang === 'auto' ? detectLanguage(text) : outputLang;
+    const lowerText = text.toLowerCase();
     
-    // 기본 변환 로직을 사용하되, 톤별로 약간 다른 응답 반환
+    // 영어 처리
+    if (targetLanguage === 'en') {
+      // Database/Server error related Mock responses
+      if (lowerText.includes('database') || lowerText.includes('query') || lowerText.includes('timeout') || lowerText.includes('500') || lowerText.includes('server')) {
+        const dbErrorResponses = {
+          '기본': 'Hello. A temporary system issue occurred. The service is currently available normally, and we will resolve it as soon as possible. We apologize for the inconvenience.',
+          '정중형': 'Hello. We apologize for the inconvenience caused by a temporary system issue. The service is currently available normally, and we will resolve it as soon as possible.',
+          '공감형': 'Hello. We sincerely apologize for the inconvenience. A temporary system issue occurred, but the service is now available normally. We will resolve it quickly.',
+          '간결형': 'A temporary system issue occurred. The service is currently available. We will resolve it quickly.',
+          '전문형': 'Hello. A temporary system issue occurred. The service is currently available normally, and we will resolve it as soon as possible.',
+          '친근형': 'Hello! A temporary system issue occurred, but the service is now available normally. We will resolve it quickly!'
+        };
+        return dbErrorResponses[tone] || dbErrorResponses['기본'];
+      }
+      
+      // 502 error related Mock responses
+      if (lowerText.includes('502') || lowerText.includes('error') || lowerText.includes('token') || lowerText.includes('authentication') || lowerText.includes('cache') || lowerText.includes('root cause')) {
+        const errorResponses = {
+          '기본': 'Hello. A temporary system error occurred. The service is currently available normally, and we are checking to prevent recurrence. We apologize for the inconvenience.',
+          '정중형': 'Hello. We apologize for the inconvenience caused by a temporary system error. The service is currently available normally, and we are checking to prevent recurrence.',
+          '공감형': 'Hello. We sincerely apologize for the inconvenience. A temporary system error occurred, but the service is now available normally. We are checking to make sure this issue doesn\'t happen again.',
+          '간결형': 'A temporary system error occurred. The service is currently available. Sorry.',
+          '전문형': 'Hello. A temporary system error occurred. The service is currently available normally, and we are checking to prevent recurrence.',
+          '친근형': 'Hello! A temporary system error occurred, but the service is now available normally. We are checking to make sure this issue doesn\'t happen again!'
+        };
+        return errorResponses[tone] || errorResponses['기본'];
+      }
+      
+      // System maintenance related Mock responses
+      if (lowerText.includes('maintenance') || lowerText.includes('inspection') || lowerText.includes('restricted') || lowerText.includes('limited')) {
+        const maintenanceResponses = {
+          '기본': 'Hello. The system is currently under maintenance. Service usage may be temporarily restricted. We apologize for the inconvenience.',
+          '정중형': 'Hello. The system is currently under maintenance. Service usage may be temporarily restricted. We appreciate your understanding and apologize for the inconvenience.',
+          '공감형': 'Hello. We sincerely apologize for the inconvenience. The system is currently under maintenance, and service usage may be temporarily restricted. We will resolve it quickly.',
+          '간결형': 'System is under maintenance. Service usage may be restricted. Sorry.',
+          '전문형': 'Hello. The system is currently under maintenance. Service usage may be temporarily restricted.',
+          '친근형': 'Hello! The system is currently under maintenance, and service usage may be temporarily restricted. We appreciate your understanding!'
+        };
+        return maintenanceResponses[tone] || maintenanceResponses['기본'];
+      }
+      
+      // Problem checking related Mock responses
+      if (lowerText.includes('checking') && lowerText.includes('problem')) {
+        const checkingResponses = {
+          '기본': 'Hello. We are checking the issue you mentioned. Our technical team is finding a solution, so please wait a moment.',
+          '정중형': 'Hello. We are checking the issue you mentioned. Our technical team is finding a solution, so please wait a moment.',
+          '공감형': 'Hello. We are checking the issue you mentioned. Our technical team is finding a solution, so please wait a moment.',
+          '간결형': 'Checking the issue. Please wait a moment.',
+          '전문형': 'Hello. We are checking the issue you mentioned. Our technical team is finding a solution.',
+          '친근형': 'Hello! We are checking the issue you mentioned. Our technical team is finding a solution, so please wait a moment!'
+        };
+        return checkingResponses[tone] || checkingResponses['기본'];
+      }
+      
+      // Resolved related Mock responses
+      if (lowerText.includes('resolved') || lowerText.includes('fixed') || (lowerText.includes('issue') && lowerText.includes('solved'))) {
+        const resolvedResponses = {
+          '기본': 'Hello. The issue you previously inquired about has been resolved. Please try using the service again. We apologize for the inconvenience.',
+          '정중형': 'Hello. The issue you previously inquired about has been resolved. Please try using the service again. We apologize for the inconvenience.',
+          '공감형': 'Hello. The issue you previously inquired about has been resolved. It should work normally now. We apologize for the inconvenience.',
+          '간결형': 'The issue has been resolved. Please try using the service again.',
+          '전문형': 'Hello. The issue you previously inquired about has been resolved. Please try using the service again.',
+          '친근형': 'Hello! The issue you previously inquired about has been resolved. It should work normally now!'
+        };
+        return resolvedResponses[tone] || resolvedResponses['기본'];
+      }
+      
+      // 기본 변환 로직 사용
+      const baseResponse = generateCustomerFriendlyResponse(text, tone, outputLang);
+      return baseResponse;
+    }
+    
+    // 한국어 처리 (기존 로직)
+    // 데이터베이스/서버 에러 관련 Mock 응답
+    if (lowerText.includes('데이터베이스') || lowerText.includes('쿼리') || lowerText.includes('타임아웃') || lowerText.includes('500') || lowerText.includes('서버에서')) {
+      const dbErrorResponses = {
+        '기본': '안녕하세요. 일시적인 시스템 문제가 발생했습니다. 현재는 정상적으로 이용 가능하시며, 빠른 시일 내에 해결하도록 하겠습니다. 불편을 드려 죄송합니다.',
+        '정중형': '안녕하세요. 일시적인 시스템 문제가 발생하여 불편을 드려 죄송합니다. 현재는 정상적으로 이용 가능하시며, 빠른 시일 내에 해결하도록 하겠습니다.',
+        '공감형': '안녕하세요. 불편을 드려 죄송해요. 일시적인 시스템 문제가 발생했었는데, 지금은 정상적으로 이용 가능하세요. 빠르게 해결하도록 하겠습니다.',
+        '간결형': '일시적인 시스템 문제가 발생했습니다. 현재는 정상 이용 가능합니다. 빠르게 해결하겠습니다.',
+        '전문형': '안녕하세요. 일시적인 시스템 문제가 발생했습니다. 현재는 정상적으로 이용 가능하며, 빠른 시일 내에 해결하도록 하겠습니다.',
+        '친근형': '안녕하세요! 일시적인 시스템 문제가 발생했었는데, 지금은 정상적으로 이용 가능해요. 빠르게 해결하도록 하겠습니다!'
+      };
+      return dbErrorResponses[tone] || dbErrorResponses['기본'];
+    }
+    
+    // 502 에러 관련 Mock 응답
+    if (lowerText.includes('502') || lowerText.includes('에러') || lowerText.includes('토큰') || lowerText.includes('인증 서버') || lowerText.includes('캐시') || lowerText.includes('근본 원인')) {
+      const errorResponses = {
+        '기본': '안녕하세요. 일시적인 시스템 오류가 발생했습니다. 지금은 정상적으로 이용 가능하시며, 재발 방지를 위해 확인 중입니다. 불편을 드려 죄송합니다.',
+        '정중형': '안녕하세요. 일시적인 시스템 오류가 발생하여 불편을 드려 죄송합니다. 현재는 정상적으로 이용 가능하시며, 재발 방지를 위해 확인 중입니다.',
+        '공감형': '안녕하세요. 불편을 드려 죄송해요. 일시적인 시스템 오류가 발생했었는데, 지금은 정상적으로 이용 가능하세요. 같은 문제가 생기지 않도록 확인하고 있어요.',
+        '간결형': '일시적인 시스템 오류가 발생했습니다. 현재는 정상 이용 가능합니다. 죄송합니다.',
+        '전문형': '안녕하세요. 일시적인 시스템 오류가 발생했습니다. 현재는 정상적으로 이용 가능하며, 재발 방지를 위해 확인 중입니다.',
+        '친근형': '안녕하세요! 일시적인 시스템 오류가 발생했었는데, 지금은 정상적으로 이용 가능해요. 같은 문제가 생기지 않도록 확인 중이에요!'
+      };
+      return errorResponses[tone] || errorResponses['기본'];
+    }
+    
+    // 시스템 점검 관련 Mock 응답
+    if (lowerText.includes('점검') || lowerText.includes('제한')) {
+      const maintenanceResponses = {
+        '기본': '안녕하세요. 현재 시스템 점검 중입니다. 일시적으로 서비스 이용이 제한될 수 있습니다. 불편을 드려 죄송합니다.',
+        '정중형': '안녕하세요. 현재 시스템 점검 중입니다. 일시적으로 서비스 이용이 제한될 수 있으니 양해 부탁드립니다. 불편을 드려 죄송합니다.',
+        '공감형': '안녕하세요. 불편을 드려 죄송해요. 현재 시스템 점검 중이에요. 다만 일시적으로 서비스 이용이 제한될 수 있어요. 빠르게 해결하도록 하겠습니다.',
+        '간결형': '시스템 점검 중입니다. 서비스 이용이 제한될 수 있습니다. 죄송합니다.',
+        '전문형': '안녕하세요. 현재 시스템 점검 중입니다. 일시적으로 서비스 이용이 제한될 수 있습니다.',
+        '친근형': '안녕하세요! 현재 시스템 점검 중이에요. 일시적으로 서비스 이용이 제한될 수 있어요. 양해 부탁드려요!'
+      };
+      return maintenanceResponses[tone] || maintenanceResponses['기본'];
+    }
+    
+    // 문제 확인 중 관련 Mock 응답
+    if (lowerText.includes('확인') && lowerText.includes('문제')) {
+      const checkingResponses = {
+        '기본': '안녕하세요. 말씀해 주신 문제를 확인하고 있습니다. 기술팀에서 해결 방법을 찾고 있으니 잠시만 기다려주세요.',
+        '정중형': '안녕하세요. 말씀해 주신 문제를 확인하고 있습니다. 기술팀에서 해결 방법을 찾고 있으니 잠시만 기다려주시기 바랍니다.',
+        '공감형': '안녕하세요. 말씀해 주신 문제를 확인하고 있어요. 기술팀에서 해결 방법을 찾고 있으니 조금만 기다려주세요.',
+        '간결형': '문제를 확인 중입니다. 잠시만 기다려주세요.',
+        '전문형': '안녕하세요. 말씀해 주신 문제를 확인하고 있습니다. 기술팀에서 해결 방법을 찾고 있습니다.',
+        '친근형': '안녕하세요! 말씀해 주신 문제를 확인하고 있어요. 기술팀에서 해결 방법을 찾고 있으니 조금만 기다려주세요!'
+      };
+      return checkingResponses[tone] || checkingResponses['기본'];
+    }
+    
+    // 해결 완료 관련 Mock 응답
+    if (lowerText.includes('해결') && (lowerText.includes('완료') || lowerText.includes('되었'))) {
+      const resolvedResponses = {
+        '기본': '안녕하세요. 이전에 문의해 주신 문제가 해결되었습니다. 다시 이용해보시기 바랍니다. 불편을 드려 죄송했습니다.',
+        '정중형': '안녕하세요. 이전에 문의해 주신 문제가 해결되었습니다. 다시 이용해보시기 바랍니다. 불편을 드려 죄송했습니다.',
+        '공감형': '안녕하세요. 이전에 문의해 주신 문제가 해결되었어요. 다시 이용해보시면 정상적으로 작동할 거예요. 불편을 드려 죄송했어요.',
+        '간결형': '문제가 해결되었습니다. 다시 이용해보시기 바랍니다.',
+        '전문형': '안녕하세요. 이전에 문의해 주신 문제가 해결되었습니다. 다시 이용해보시기 바랍니다.',
+        '친근형': '안녕하세요! 이전에 문의해 주신 문제가 해결되었어요. 다시 이용해보시면 정상적으로 작동할 거예요!'
+      };
+      return resolvedResponses[tone] || resolvedResponses['기본'];
+    }
+    
+    // 기본 변환 로직 사용
     const baseResponse = generateCustomerFriendlyResponse(text, tone);
-    return mockResponses[tone] || baseResponse;
+    return baseResponse;
   };
 
   // AI API를 사용한 고객 친화적 변환 함수
-  const generateAICustomerFriendlyResponse = async (text, tone = '기본') => {
+  const generateAICustomerFriendlyResponse = async (text, tone = '기본', outputLang = 'auto') => {
+    // 출력 언어 결정
+    const targetLanguage = outputLang === 'auto' ? detectLanguage(text) : outputLang;
+    
     // Mock API 모드인 경우 Mock 응답 사용
     if (API_CONFIG.useMockAPI) {
-      return generateMockAIResponse(text, tone);
+      return generateMockAIResponse(text, tone, outputLang);
     }
     
     // API가 비활성화되어 있거나 토큰이 없으면 기본 변환 사용
     if (!API_CONFIG.useAPI || !API_CONFIG.apiKey) {
       const simplifiedText = simplifyTechnicalTerms(text);
-      return generateCustomerFriendlyResponse(simplifiedText, tone);
+      return generateCustomerFriendlyResponse(simplifiedText, tone, outputLang);
     }
 
     try {
       // 프롬프트 빌더를 사용해서 동적으로 프롬프트 생성
-      const prompt = buildPrompt(text, tone);
+      const prompt = buildPrompt(text, tone, targetLanguage);
       
       // 🔑 API 호출 (토큰이 설정되어 있을 때만 실행됨)
       // src/config.js 파일에서 API_CONFIG.apiKey와 API_CONFIG.useAPI를 설정하세요
@@ -462,6 +715,7 @@ function App() {
         body: JSON.stringify({
           input: text,
           tone: tone,
+          outputLanguage: targetLanguage,
           apiKey: API_CONFIG.apiKey  // 서버에서 사용할 수 있도록 전달
         })
       });
@@ -476,7 +730,7 @@ function App() {
       console.error('AI API 오류:', error);
       // AI API 실패 시 기존 로직으로 폴백
       const simplifiedText = simplifyTechnicalTerms(text);
-      return generateCustomerFriendlyResponse(simplifiedText, tone);
+      return generateCustomerFriendlyResponse(simplifiedText, tone, outputLang);
     }
   };
 
@@ -485,21 +739,53 @@ function App() {
     if (!inputText.trim()) return;
 
     setIsLoading(true);
-    setIsCopied(false); // 새 답변 생성 시 복사 상태 초기화
+    setIsCopiedKO(false);
+    setIsCopiedEN(false);
     
     try {
-      // AI API를 사용한 변환 시도 (톤 포함)
-      const customerFriendlyText = await generateAICustomerFriendlyResponse(inputText, selectedTone);
-      setOutputText(customerFriendlyText);
+      // 한국어와 영어 두 가지 버전 모두 생성
+      const [customerFriendlyTextKO, customerFriendlyTextEN] = await Promise.all([
+        generateAICustomerFriendlyResponse(inputText, selectedTone, 'ko'),
+        generateAICustomerFriendlyResponse(inputText, selectedTone, 'en')
+      ]);
+      setOutputTextKO(customerFriendlyTextKO);
+      setOutputTextEN(customerFriendlyTextEN);
     } catch (error) {
       console.error('변환 오류:', error);
-      // 오류 발생 시 기본 변환 사용 (톤 포함)
+      // 오류 발생 시 기본 변환 사용
       const simplifiedText = simplifyTechnicalTerms(inputText);
-      const customerFriendlyText = generateCustomerFriendlyResponse(simplifiedText, selectedTone);
-      setOutputText(customerFriendlyText);
+      const customerFriendlyTextKO = generateCustomerFriendlyResponse(simplifiedText, selectedTone, 'ko');
+      const customerFriendlyTextEN = generateCustomerFriendlyResponse(simplifiedText, selectedTone, 'en');
+      setOutputTextKO(customerFriendlyTextKO);
+      setOutputTextEN(customerFriendlyTextEN);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // 테스트 예시 목록
+  const testExamples = [
+    {
+      text: '502 에러가 발생했습니다. 인증 서버에서 토큰이 만료되어 발생했습니다. 캐시 초기화 후 임시 조치했고, 근본 원인 분석 중입니다.'
+    },
+    {
+      text: '데이터베이스 쿼리 타임아웃이 발생하고 있습니다. 현재 서버에서 500 에러가 발생하고 있고, API 호출에서도 문제가 확인되었습니다. 긴급 문제 해결를 배포해서 문제를 해결하겠습니다.'
+    }
+  ];
+
+  // 테스트 예시 복사 함수
+  const copyTestExample = (text) => {
+    setInputText(text);
+    setIsCopiedKO(false);
+    setIsCopiedEN(false);
+    // 입력 영역으로 포커스 이동
+    setTimeout(() => {
+      const textarea = document.getElementById('input-text');
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(text.length, text.length);
+      }
+    }, 100);
   };
 
   // 빠른 답변 템플릿
@@ -522,8 +808,31 @@ function App() {
     }
   ];
 
-  const useQuickResponse = (template) => {
+  const useQuickResponse = async (template) => {
     setInputText(template);
+    // 템플릿 선택 시 자동으로 변환 실행
+    setIsLoading(true);
+    setIsCopiedKO(false);
+    setIsCopiedEN(false);
+    
+    try {
+      // 한국어와 영어 두 가지 버전 모두 생성
+      const [customerFriendlyTextKO, customerFriendlyTextEN] = await Promise.all([
+        generateAICustomerFriendlyResponse(template, selectedTone, 'ko'),
+        generateAICustomerFriendlyResponse(template, selectedTone, 'en')
+      ]);
+      setOutputTextKO(customerFriendlyTextKO);
+      setOutputTextEN(customerFriendlyTextEN);
+    } catch (error) {
+      console.error('변환 오류:', error);
+      const simplifiedText = simplifyTechnicalTerms(template);
+      const customerFriendlyTextKO = generateCustomerFriendlyResponse(simplifiedText, selectedTone, 'ko');
+      const customerFriendlyTextEN = generateCustomerFriendlyResponse(simplifiedText, selectedTone, 'en');
+      setOutputTextKO(customerFriendlyTextKO);
+      setOutputTextEN(customerFriendlyTextEN);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -548,14 +857,40 @@ function App() {
             <div className="input-section">
               <h3>개발자 답변 입력</h3>
               <div style={{ 
-                marginBottom: '10px', 
-                padding: '8px 12px', 
-                backgroundColor: '#f0f7ff', 
-                borderRadius: '4px',
-                fontSize: '13px',
-                color: '#555'
+                marginBottom: '10px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '8px'
               }}>
-                💡 <strong>테스트 예시</strong> <p></p>안녕하세요. 현재 시스템 점검 중입니다. 일시적으로 서비스 이용이 제한됩니다.
+                {testExamples.map((example, index) => (
+                  <button
+                    key={index}
+                    onClick={() => copyTestExample(example.text)}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#f0f7ff',
+                      border: '1px solid #0066cc',
+                      borderRadius: '4px',
+                      fontSize: '13px',
+                      color: '#0066cc',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#0066cc';
+                      e.target.style.color = '#fff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#f0f7ff';
+                      e.target.style.color = '#0066cc';
+                    }}
+                  >
+                    💡 테스트 예시 {index + 1}
+                  </button>
+                ))}
               </div>
               <textarea
                             id="input-text"
@@ -565,7 +900,8 @@ function App() {
                             value={inputText}
                             onChange={(e) => {
                               setInputText(e.target.value);
-                              setIsCopied(false); // 입력 변경 시 복사 상태 초기화
+                              setIsCopiedKO(false);
+                              setIsCopiedEN(false);
                             }}
                             rows={6}
                           />
@@ -579,13 +915,13 @@ function App() {
                       key={tone}
                       className={`tone-btn ${selectedTone === tone ? 'active' : ''}`}
                       onClick={() => setSelectedTone(tone)}
-                      title={getToneDescription(tone)}
+                      title={getToneDescription(tone, 'ko')}
                     >
                       {tone}
                     </button>
                   ))}
                 </div>
-                <p className="tone-description">{getToneDescription(selectedTone)}</p>
+                <p className="tone-description">{getToneDescription(selectedTone, 'ko')}</p>
               </div>
 
               {/* 프롬프트 미리보기 */}
@@ -606,7 +942,11 @@ function App() {
 
               {/* 빠른 답변 템플릿 */}
               <div className="quick-responses">
-                <h4>빠른 답변 템플릿</h4>
+                <h4>
+                  {API_CONFIG.useMockAPI 
+                    ? '빠른 답변 템플릿 테스트 해보세요' 
+                    : '빠른 답변 템플릿'}
+                </h4>
                 <div className="template-buttons">
                   {quickResponses.map((response, index) => (
                     <button
@@ -642,7 +982,7 @@ function App() {
                   fontSize: '13px',
                   color: '#0c5460'
                 }}>
-                  🤖 <strong>AI가 답변을 작성합니다.</strong> 고객 친화적인 답변을 자동으로 생성합니다.
+                  🤖 <strong>AI가 답변을 작성합니다.</strong> 한국어와 영어 두 가지 버전을 자동으로 생성합니다.
                 </div>
               ) : API_CONFIG.useMockAPI ? (
                 <div style={{ 
@@ -654,7 +994,7 @@ function App() {
                   fontSize: '13px',
                   color: '#004085'
                 }}>
-                  🧪 <strong>Mock AI 모드로 테스트 중입니다.</strong> 실제 API 호출 없이 AI 응답을 시뮬레이션합니다. <p></p>실제 AI를 사용하려면 <code style={{ backgroundColor: '#f8f9fa', padding: '2px 4px', borderRadius: '2px' }}>src/config.js</code>에서 토큰을 설정하세요.
+                  🧪 <strong>Mock AI 모드로 테스트 중입니다.</strong> 실제 API 호출 없이 AI 응답을 시뮬레이션합니다. 한국어와 영어 두 가지 버전을 생성합니다.
                 </div>
               ) : (
                 <div style={{ 
@@ -666,47 +1006,97 @@ function App() {
                   fontSize: '13px',
                   color: '#856404'
                 }}>
-                  💡 <strong>간단한 변환 규칙을 사용 중입니다.</strong> 더 나은 결과를 위해 <code style={{ backgroundColor: '#f8f9fa', padding: '2px 4px', borderRadius: '2px' }}>src/config.js</code>에서 <code style={{ backgroundColor: '#f8f9fa', padding: '2px 4px', borderRadius: '2px' }}>useMockAPI: true</code>로 설정하거나 실제 AI API를 사용하세요.
+                  💡 <strong>간단한 변환 규칙을 사용 중입니다.</strong> 한국어와 영어 두 가지 버전을 생성합니다.
                 </div>
               )}
-              <textarea
-                className="output-textarea"
-                value={outputText}
-                onChange={(e) => {
-                  setOutputText(e.target.value);
-                  setIsCopied(false); // 수정 시 복사 상태 초기화
-                }}
-                placeholder="변환된 답변이 여기에 표시됩니다. 필요시 직접 수정할 수 있습니다."
-                rows={8}
-                style={{ 
-                  width: '100%', 
-                  padding: '12px', 
-                  border: '1px solid #ddd', 
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  resize: 'vertical',
-                  minHeight: '150px'
-                }}
-              />
               
-              {outputText && (
-                <button
-                  className="copy-btn"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(outputText);
-                      setIsCopied(true);
-                      // 2초 후 자동으로 "복사하기"로 복원 (선택사항)
-                      setTimeout(() => setIsCopied(false), 2000);
-                    } catch (error) {
-                      console.error('복사 실패:', error);
-                    }
+              {/* 한국어 답변 */}
+              <div style={{ marginBottom: '20px' }}>
+                <h4 style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#333' }}>
+                  🇰🇷 한국어
+                </h4>
+                <textarea
+                  className="output-textarea"
+                  value={outputTextKO}
+                  onChange={(e) => {
+                    setOutputTextKO(e.target.value);
+                    setIsCopiedKO(false);
                   }}
-                >
-                  {isCopied ? '완료' : '복사하기'}
-                </button>
-              )}
+                  placeholder="한국어 답변이 여기에 표시됩니다. 필요시 직접 수정할 수 있습니다."
+                  rows={6}
+                  style={{ 
+                    width: '100%', 
+                    padding: '12px', 
+                    border: '1px solid #ddd', 
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    minHeight: '120px'
+                  }}
+                />
+                {outputTextKO && (
+                  <button
+                    className="copy-btn"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(outputTextKO);
+                        setIsCopiedKO(true);
+                        setTimeout(() => setIsCopiedKO(false), 2000);
+                      } catch (error) {
+                        console.error('복사 실패:', error);
+                      }
+                    }}
+                    style={{ marginTop: '8px' }}
+                  >
+                    {isCopiedKO ? '완료' : '한국어 복사'}
+                  </button>
+                )}
+              </div>
+
+              {/* 영어 답변 */}
+              <div>
+                <h4 style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#333' }}>
+                  🇺🇸 English
+                </h4>
+                <textarea
+                  className="output-textarea"
+                  value={outputTextEN}
+                  onChange={(e) => {
+                    setOutputTextEN(e.target.value);
+                    setIsCopiedEN(false);
+                  }}
+                  placeholder="English response will be displayed here. You can edit it if needed."
+                  rows={6}
+                  style={{ 
+                    width: '100%', 
+                    padding: '12px', 
+                    border: '1px solid #ddd', 
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    minHeight: '120px'
+                  }}
+                />
+                {outputTextEN && (
+                  <button
+                    className="copy-btn"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(outputTextEN);
+                        setIsCopiedEN(true);
+                        setTimeout(() => setIsCopiedEN(false), 2000);
+                      } catch (error) {
+                        console.error('복사 실패:', error);
+                      }
+                    }}
+                    style={{ marginTop: '8px' }}
+                  >
+                    {isCopiedEN ? '완료' : 'English Copy'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -714,23 +1104,70 @@ function App() {
           {/* 전문용어 사전 */}
           <div className="terms-dictionary">
             <h3>주요 전문용어 사전</h3>
-            <div className="search-container">
+            <div style={{ 
+              position: 'relative',
+              marginBottom: '1.5rem',
+              maxWidth: '400px',
+              marginLeft: 'auto',
+              marginRight: 'auto'
+            }}>
               <input
                 type="text"
                 placeholder="용어나 설명을 검색하세요..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  paddingRight: searchTerm ? '35px' : '12px',
+                  border: '1px solid #0066cc',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  backgroundColor: '#f0f7ff',
+                  color: '#0066cc',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#0052a3';
+                  e.target.style.boxShadow = '0 0 0 2px rgba(0, 102, 204, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#0066cc';
+                  e.target.style.boxShadow = 'none';
+                }}
               />
               {searchTerm && (
                 <button 
-                  className="clear-search-btn"
                   onClick={() => setSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#0066cc',
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '16px',
+                    lineHeight: '1',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#0066cc';
+                    e.target.style.color = '#fff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                    e.target.style.color = '#0066cc';
+                  }}
                 >
                   ✕
                 </button>
               )}
-        </div>
+            </div>
             
             {searchTerm ? (
               // 검색 결과 표시

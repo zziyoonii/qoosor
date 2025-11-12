@@ -10,15 +10,95 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// 언어 감지 함수
+const detectLanguage = (text) => {
+  if (!text || text.trim().length === 0) return 'ko';
+  
+  // 한글이 포함되어 있으면 한국어
+  const koreanRegex = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/;
+  if (koreanRegex.test(text)) {
+    return 'ko';
+  }
+  
+  // 영어가 주로 포함되어 있으면 영어
+  const englishRegex = /[a-zA-Z]/;
+  if (englishRegex.test(text)) {
+    return 'en';
+  }
+  
+  // 기본값은 한국어
+  return 'ko';
+};
+
 // AI API 변환 엔드포인트 (목업 버전)
 app.post('/api/gpt', async (req, res) => {
   try {
-    const { input, tone } = req.body;
+    const { input, tone, outputLanguage } = req.body;
 
     if (!input) {
       return res.status(400).json({ error: '입력 텍스트가 필요합니다.' });
     }
 
+    // 출력 언어 결정: outputLanguage가 있으면 사용, 없으면 자동 감지
+    const targetLanguage = outputLanguage && outputLanguage !== 'auto' ? outputLanguage : detectLanguage(input);
+    const lowerText = input.toLowerCase();
+
+    // 영어 처리
+    if (targetLanguage === 'en') {
+      const mockResponsesEN = {
+        기본: {
+          'maintenance': 'You should be able to access the service stably now. We\'re also checking to make sure this issue doesn\'t happen again!',
+          'server error': 'There was a temporary issue with the system, but we\'ve resolved it now. You can use the service stably.',
+          'API error': 'There was a brief issue with the external service connection, but it\'s working normally now.',
+          'database': 'There was a brief delay in information processing, but it\'s working normally now.',
+          'timeout': 'The processing time took longer than expected, but it\'s working normally now.',
+          '기본': 'There was a brief issue while processing your request, but it\'s working normally now.'
+        },
+        정중형: {
+          'maintenance': 'The connection error was caused by temporary authentication expiration. The service is currently available normally, and we are conducting inspections to prevent recurrence.',
+          'server error': 'A temporary issue occurred on the server. The service is currently available normally, and we are conducting inspections to prevent recurrence.',
+          'API error': 'There was a temporary issue with the external service connection. It is currently working normally.',
+          'database': 'There was a temporary delay in information processing. It is currently working normally.',
+          'timeout': 'The processing time took longer than expected. It is currently working normally.',
+          '기본': 'There was a temporary issue while processing your request. It is currently working normally.'
+        },
+        공감형: {
+          'maintenance': 'We apologize for the inconvenience. The connection error was caused by temporary authentication interruption, and the service is now available stably. We\'re also checking to make sure this issue doesn\'t happen again.',
+          'server error': 'You must have been surprised by the sudden error. There was a temporary issue with the system, but we\'ve resolved it now. We\'re also checking to make sure this issue doesn\'t happen again.',
+          'API error': 'You must have been inconvenienced by the external service connection issue. It\'s working normally now, so please rest assured. We\'re also checking to make sure this issue doesn\'t happen again.',
+          'database': 'You must have been frustrated by the delay in information processing. It\'s working normally now. We\'re also checking to make sure this issue doesn\'t happen again.',
+          'timeout': 'You must have been inconvenienced by the long processing time. It\'s working normally now. We will improve it to be faster.',
+          '기본': 'We sincerely apologize for the inconvenience. It\'s working normally now, so please rest assured. We\'re also checking to make sure this issue doesn\'t happen again.'
+        },
+        간결형: {
+          'maintenance': 'An error occurred due to temporary authentication interruption, and the service is now back to normal.',
+          'server error': 'There was a temporary issue on the server, and the service is now back to normal.',
+          'API error': 'There was an issue with the external service connection, and it\'s now back to normal.',
+          'database': 'There was a delay in information processing, and it\'s now back to normal.',
+          'timeout': 'The processing time exceeded, and it\'s now back to normal.',
+          '기본': 'There was a temporary issue, and it\'s now back to normal.'
+        }
+      };
+
+      // 영어 키워드 찾기
+      const findKeywordEN = (text) => {
+        const keywords = ['maintenance', 'server error', 'API error', 'database', 'timeout'];
+        for (const keyword of keywords) {
+          if (text.includes(keyword)) {
+            return keyword;
+          }
+        }
+        return '기본';
+      };
+
+      const keyword = findKeywordEN(lowerText);
+      const toneResponses = mockResponsesEN[tone] || mockResponsesEN['기본'];
+      const result = toneResponses[keyword] || toneResponses['기본'];
+
+      return res.json({ result });
+    }
+
+    // 한국어 처리 (기존 로직)
     // 💡 목업 응답 로직
     const mockResponses = {
       기본: {
@@ -144,3 +224,4 @@ require('dotenv').config(); // .env 파일을 읽어옴
 const apiKey = process.env.OPENAI_API_KEY;
 
 console.log("🔐 내 API 키:", apiKey);
+ 

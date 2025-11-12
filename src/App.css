@@ -593,26 +593,26 @@ body {
   border-radius: 12px;
   padding: 1.5rem;
   transition: all 0.3s ease;
-}
+  }
 
 .term-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
+  }
+  
 .term-card h4 {
   font-size: 1.1rem;
   font-weight: 600;
   color: #2d3748;
   margin-bottom: 0.5rem;
-}
-
+  }
+  
 .term-card p {
   color: #4a5568;
   font-size: 0.9rem;
   line-height: 1.5;
-}
-
+  }
+  
 /* Responsive design */
 @media (max-width: 768px) {
   .header-title {
@@ -668,8 +668,8 @@ body {
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
-}
-
+  }
+  
 ::-webkit-scrollbar-track {
   background: #f1f1f1;
   border-radius: 4px;
@@ -678,7 +678,7 @@ body {
 ::-webkit-scrollbar-thumb {
   background: #c1c1c1;
   border-radius: 4px;
-}
+  }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
