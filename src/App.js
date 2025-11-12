@@ -947,7 +947,7 @@ function App() {
               <div className="quick-responses">
                 <h4>
                   {API_CONFIG.useMockAPI 
-                    ? '빠른 답변 템플릿 테스트 해보세요' 
+                    ? '빠른 답변 템플릿 (Mock AI 모드)' 
                     : '빠른 답변 템플릿'}
                 </h4>
                 <div className="template-buttons">
